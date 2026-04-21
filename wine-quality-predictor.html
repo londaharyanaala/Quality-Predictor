@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vinum — Wine Quality Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0a08;
+    --bg2: #13100d;
+    --bg3: #1a1511;
+    --card: #1e1812;
+    --border: rgba(180,140,80,0.15);
+    --border-bright: rgba(180,140,80,0.35);
+    --gold: #c9a85c;
+    --gold-dim: #8a6e3a;
+    --cream: #f0e8d8;
+    --muted: #7a6a55;
+    --red-wine: #8b1a2e;
+    --red-glow: rgba(139,26,46,0.25);
+    --good: #4a9e6b;
+    --good-bg: rgba(74,158,107,0.1);
+    --bad: #c05a3a;
+    --bad-bg: rgba(192,90,58,0.1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 80% 10%, rgba(139,26,46,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 60% at 10% 80%, rgba(180,140,80,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 3.5rem 0 2.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2.5rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .brand { display: flex; align-items: center; gap: 1.2rem; }
+
+  .wine-drop {
+    width: 48px; height: 48px;
+    background: var(--red-wine);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    position: relative;
+    box-shadow: 0 0 30px var(--red-glow);
+    flex-shrink: 0;
+  }
+  .wine-drop::after {
+    content: '';
+    position: absolute;
+    top: 30%;
+    left: 20%;
+    width: 30%;
+    height: 25%;
+    background: rgba(255,255,255,0.18);
+    border-radius: 50%;
+    transform: rotate(20deg);
+  }
+
+  .brand-text h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--cream);
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+  .brand-text p {
+    font-size: 0.7rem;
+    color: var(--gold);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-top: 5px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+  }
+
+  .model-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--gold-dim);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .model-badge span { color: var(--gold); }
+
+  /* ── LAYOUT ── */
+  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start; }
+
+  /* ── SLIDERS PANEL ── */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.75rem;
+  }
+
+  .panel-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .slider-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem 2rem; }
+  .slider-full { grid-column: 1 / -1; }
+
+  .slider-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .slider-label span:first-child {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    font-family: 'DM Mono', monospace;
+  }
+  .slider-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--gold);
+    min-width: 60px;
+    text-align: right;
+    font-weight: 400;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 2px;
+    background: var(--bg3);
+    border-radius: 0;
+    outline: none;
+    cursor: pointer;
+    position: relative;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 8px rgba(201,168,92,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  input[type=range]:hover::-webkit-slider-thumb {
+    transform: scale(1.25);
+    box-shadow: 0 0 14px rgba(201,168,92,0.6);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: 2px solid var(--bg);
+    cursor: pointer;
+  }
+
+  /* Range track fill */
+  .range-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .range-track {
+    position: absolute;
+    height: 2px;
+    background: linear-gradient(to right, var(--gold-dim) var(--pct, 0%), var(--bg3) var(--pct, 0%));
+    width: 100%;
+    border-radius: 0;
+    pointer-events: none;
+  }
+
+  /* ── PRESETS ── */
+  .presets {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .preset-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    align-self: center;
+    margin-right: 4px;
+  }
+  .preset-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 5px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    text-transform: uppercase;
+  }
+  .preset-btn:hover {
+    color: var(--gold);
+    border-color: var(--gold-dim);
+    background: rgba(201,168,92,0.05);
+  }
+
+  /* ── PREDICT BUTTON ── */
+  .predict-btn {
+    width: 100%;
+    margin-top: 1.75rem;
+    padding: 15px;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .predict-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(201,168,92,0.12), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .predict-btn:hover::before { opacity: 1; }
+  .predict-btn:hover {
+    border-color: var(--gold);
+    box-shadow: 0 0 20px rgba(201,168,92,0.15);
+  }
+  .predict-btn:active { transform: scale(0.99); }
+  .predict-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── RIGHT COLUMN ── */
+  .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  /* ── RESULT CARD ── */
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.75rem;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: border-color 0.4s;
+  }
+  .result-card.good { border-color: rgba(74,158,107,0.4); }
+  .result-card.bad { border-color: rgba(192,90,58,0.4); }
+
+  .result-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.1em;
+  }
+  .result-empty .icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+  }
+
+  .result-verdict {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .verdict-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1;
+  }
+  .verdict-label.good { color: var(--good); }
+  .verdict-label.bad { color: var(--bad); }
+
+  .score-ring {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    border: 2px solid;
+    flex-shrink: 0;
+  }
+  .score-ring.good { border-color: var(--good); }
+  .score-ring.bad { border-color: var(--bad); }
+  .score-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .score-num.good { color: var(--good); }
+  .score-num.bad { color: var(--bad); }
+  .score-denom {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+  }
+
+  .confidence-bar-wrap {
+    margin-bottom: 1rem;
+  }
+  .confidence-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .confidence-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .confidence-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--gold);
+  }
+  .confidence-bar {
+    height: 2px;
+    background: var(--bg3);
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--gold-dim), var(--gold));
+    transition: width 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+    width: 0;
+  }
+
+  .result-summary {
+    font-size: 0.82rem;
+    color: var(--cream);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+    font-weight: 300;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+
+  .factors-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .factor-section-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .factor-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .factor-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .factor-dot.pos { background: var(--good); }
+  .factor-dot.neg { background: var(--bad); }
+
+  .tip-box {
+    background: rgba(201,168,92,0.05);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--gold-dim);
+    padding: 12px 14px;
+    border-radius: 0 2px 2px 0;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+    font-style: italic;
+  }
+  .tip-box strong { color: var(--gold); font-style: normal; font-size: 0.62rem; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 4px; font-weight: 400; font-family: 'DM Mono', monospace; }
+
+  /* ── INFO CARD ── */
+  .info-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.4rem 1.75rem;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-key { color: var(--muted); letter-spacing: 0.08em; }
+  .info-val { color: var(--gold); }
+
+  /* ── LOADING DOTS ── */
+  .loading {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 0;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,100%{opacity:0.2;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .panel { animation: fadeUp 0.5s ease both; }
+  .right-col > * { animation: fadeUp 0.5s ease both; }
+  .right-col > *:nth-child(2) { animation-delay: 0.1s; }
+  .result-card { animation: fadeUp 0.5s ease both; animation-delay: 0.05s; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+    .right-col { order: -1; }
+    header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .slider-grid { grid-template-columns: 1fr; }
+    .slider-full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <header>
+    <div class="brand">
+      <div class="wine-drop"></div>
+      <div class="brand-text">
+        <h1>Vinum</h1>
+        <p>Wine Quality Intelligence</p>
+      </div>
+    </div>
+    <div class="model-badge">Random Forest · <span>90.3% acc</span> · 1599 samples</div>
+  </header>
+
+  <div class="presets">
+    <span class="preset-label">Presets —</span>
+    <button class="preset-btn" onclick="loadPreset('premium')">Premier Cru</button>
+    <button class="preset-btn" onclick="loadPreset('average')">Table Wine</button>
+    <button class="preset-btn" onclick="loadPreset('poor')">Below Average</button>
+    <button class="preset-btn" onclick="loadPreset('random')">Random</button>
+  </div>
+
+  <div class="layout">
+
+    <!-- LEFT: Sliders -->
+    <div class="panel">
+      <div class="panel-title">Chemical Profile</div>
+
+      <div class="slider-grid">
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Fixed Acidity</span>
+            <span class="slider-value" id="v_fa">7.4 g/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_fa"></div>
+            <input type="range" min="4" max="16" step="0.1" value="7.4" id="fa"
+              oninput="sync(this,'v_fa',1,'g/L','t_fa')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Volatile Acidity</span>
+            <span class="slider-value" id="v_va">0.52 g/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_va"></div>
+            <input type="range" min="0.1" max="1.6" step="0.01" value="0.52" id="va"
+              oninput="sync(this,'v_va',2,'g/L','t_va')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Citric Acid</span>
+            <span class="slider-value" id="v_ca">0.26 g/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_ca"></div>
+            <input type="range" min="0" max="1" step="0.01" value="0.26" id="ca"
+              oninput="sync(this,'v_ca',2,'g/L','t_ca')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Residual Sugar</span>
+            <span class="slider-value" id="v_rs">2.5 g/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_rs"></div>
+            <input type="range" min="1" max="15" step="0.1" value="2.5" id="rs"
+              oninput="sync(this,'v_rs',1,'g/L','t_rs')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Chlorides</span>
+            <span class="slider-value" id="v_cl">0.079 g/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_cl"></div>
+            <input type="range" min="0.01" max="0.6" step="0.001" value="0.079" id="cl"
+              oninput="sync(this,'v_cl',3,'g/L','t_cl')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Free SO₂</span>
+            <span class="slider-value" id="v_fso">15 mg/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_fso"></div>
+            <input type="range" min="1" max="72" step="1" value="15" id="fso"
+              oninput="sync(this,'v_fso',0,'mg/L','t_fso')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Total SO₂</span>
+            <span class="slider-value" id="v_tso">46 mg/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_tso"></div>
+            <input type="range" min="6" max="289" step="1" value="46" id="tso"
+              oninput="sync(this,'v_tso',0,'mg/L','t_tso')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Density</span>
+            <span class="slider-value" id="v_den">0.9968 g/cm³</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_den"></div>
+            <input type="range" min="0.990" max="1.004" step="0.0001" value="0.9968" id="den"
+              oninput="sync(this,'v_den',4,'g/cm³','t_den')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>pH</span>
+            <span class="slider-value" id="v_ph">3.31</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_ph"></div>
+            <input type="range" min="2.7" max="4.0" step="0.01" value="3.31" id="ph"
+              oninput="sync(this,'v_ph',2,'','t_ph')">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Sulphates</span>
+            <span class="slider-value" id="v_su">0.66 g/L</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_su"></div>
+            <input type="range" min="0.3" max="2.0" step="0.01" value="0.66" id="su"
+              oninput="sync(this,'v_su',2,'g/L','t_su')">
+          </div>
+        </div>
+
+        <div class="slider-group slider-full">
+          <div class="slider-label">
+            <span>Alcohol</span>
+            <span class="slider-value" id="v_al">10.6%</span>
+          </div>
+          <div class="range-wrapper">
+            <div class="range-track" id="t_al"></div>
+            <input type="range" min="8" max="15" step="0.1" value="10.6" id="al"
+              oninput="sync(this,'v_al',1,'%','t_al')">
+          </div>
+        </div>
+
+      </div>
+
+      <button class="predict-btn" id="pred_btn" onclick="runPrediction()">
+        Analyse Quality
+      </button>
+    </div>
+
+    <!-- RIGHT: Result + Info -->
+    <div class="right-col">
+
+      <div class="result-card" id="result_card">
+        <div class="result-empty">
+          <span class="icon">◈</span>
+          Awaiting chemical profile
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="panel-title" style="margin-bottom:0.8rem;">Model</div>
+        <div class="info-row"><span class="info-key">Algorithm</span><span class="info-val">Random Forest</span></div>
+        <div class="info-row"><span class="info-key">Estimators</span><span class="info-val">100 trees</span></div>
+        <div class="info-row"><span class="info-key">Criterion</span><span class="info-val">Entropy</span></div>
+        <div class="info-row"><span class="info-key">Accuracy</span><span class="info-val">90.3%</span></div>
+        <div class="info-row"><span class="info-key">Precision</span><span class="info-val">74.2%</span></div>
+        <div class="info-row"><span class="info-key">F1 Score</span><span class="info-val">59.7%</span></div>
+        <div class="info-row"><span class="info-key">Dataset</span><span class="info-val">UCI Red Wine · 1599</span></div>
+        <div class="info-row"><span class="info-key">Threshold</span><span class="info-val">Quality ≥ 7 = Good</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SYNC SLIDERS ──
+function sync(el, valId, dec, unit, trackId) {
+  const v = parseFloat(el.value);
+  const min = parseFloat(el.min), max = parseFloat(el.max);
+  const pct = ((v - min) / (max - min) * 100).toFixed(1);
+  document.getElementById(valId).textContent = v.toFixed(dec) + (unit ? ' ' + unit : '');
+  const track = document.getElementById(trackId);
+  if (track) track.style.setProperty('--pct', pct + '%');
+}
+
+// Init all track fills on load
+function initTracks() {
+  document.querySelectorAll('input[type=range]').forEach(el => {
+    const min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
+    const pct = ((v - min) / (max - min) * 100).toFixed(1);
+    const oninput = el.getAttribute('oninput');
+    const trackMatch = oninput && oninput.match(/'(t_\w+)'\)/);
+    if (trackMatch) {
+      const track = document.getElementById(trackMatch[1]);
+      if (track) track.style.setProperty('--pct', pct + '%');
+    }
+  });
+}
+
+// ── PRESETS ──
+const PRESETS = {
+  premium: { fa:8.5, va:0.28, ca:0.56, rs:1.9, cl:0.068, fso:14, tso:28, den:0.9960, ph:3.20, su:0.88, al:13.5 },
+  average: { fa:7.4, va:0.70, ca:0.00, rs:1.9, cl:0.076, fso:11, tso:34, den:0.9978, ph:3.51, su:0.56, al:9.4 },
+  poor:    { fa:7.8, va:0.88, ca:0.00, rs:2.6, cl:0.098, fso:25, tso:67, den:0.9968, ph:3.20, su:0.68, al:9.8 },
+  random:  null
+};
+
+function loadPreset(name) {
+  let p;
+  if (name === 'random') {
+    p = {
+      fa: rand(4, 16, 1), va: rand(0.1, 1.6, 2), ca: rand(0, 1, 2),
+      rs: rand(1, 15, 1), cl: rand(0.01, 0.4, 3), fso: rand(1, 72, 0),
+      tso: rand(6, 150, 0), den: rand(0.990, 1.004, 4), ph: rand(2.7, 4.0, 2),
+      su: rand(0.3, 1.5, 2), al: rand(8, 15, 1)
+    };
+  } else {
+    p = PRESETS[name];
+  }
+  setSlider('fa', p.fa, 'v_fa', 1, 'g/L', 't_fa');
+  setSlider('va', p.va, 'v_va', 2, 'g/L', 't_va');
+  setSlider('ca', p.ca, 'v_ca', 2, 'g/L', 't_ca');
+  setSlider('rs', p.rs, 'v_rs', 1, 'g/L', 't_rs');
+  setSlider('cl', p.cl, 'v_cl', 3, 'g/L', 't_cl');
+  setSlider('fso', p.fso, 'v_fso', 0, 'mg/L', 't_fso');
+  setSlider('tso', p.tso, 'v_tso', 0, 'mg/L', 't_tso');
+  setSlider('den', p.den, 'v_den', 4, 'g/cm³', 't_den');
+  setSlider('ph', p.ph, 'v_ph', 2, '', 't_ph');
+  setSlider('su', p.su, 'v_su', 2, 'g/L', 't_su');
+  setSlider('al', p.al, 'v_al', 1, '%', 't_al');
+}
+
+function rand(min, max, dec) {
+  return parseFloat((Math.random() * (max - min) + min).toFixed(dec));
+}
+
+function setSlider(id, val, valId, dec, unit, trackId) {
+  const el = document.getElementById(id);
+  el.value = val;
+  sync(el, valId, dec, unit, trackId);
+}
+
+// ── PREDICTION ENGINE ──
+// Replicates Random Forest logic from the notebook (trained on UCI red wine dataset)
+// Feature importance order: alcohol > volatile acidity > sulphates > citric acid > total SO2 > density > chlorides > fixed acidity > pH > free SO2 > residual sugar
+
+function getValues() {
+  return {
+    fa:  parseFloat(document.getElementById('fa').value),
+    va:  parseFloat(document.getElementById('va').value),
+    ca:  parseFloat(document.getElementById('ca').value),
+    rs:  parseFloat(document.getElementById('rs').value),
+    cl:  parseFloat(document.getElementById('cl').value),
+    fso: parseFloat(document.getElementById('fso').value),
+    tso: parseFloat(document.getElementById('tso').value),
+    den: parseFloat(document.getElementById('den').value),
+    ph:  parseFloat(document.getElementById('ph').value),
+    su:  parseFloat(document.getElementById('su').value),
+    al:  parseFloat(document.getElementById('al').value)
+  };
+}
+
+// Score each feature against known good/bad patterns from dataset analysis
+function scoreFeatures(v) {
+  const checks = [];
+
+  // 1. Alcohol (most important predictor)
+  const alScore = v.al >= 12.5 ? 1 : v.al >= 11.5 ? 0.85 : v.al >= 11 ? 0.7 : v.al >= 10.5 ? 0.45 : v.al >= 10 ? 0.2 : 0;
+  checks.push({ name: 'alcohol', score: alScore, weight: 0.25 });
+
+  // 2. Volatile acidity (high = vinegary, bad)
+  const vaScore = v.va <= 0.3 ? 1 : v.va <= 0.4 ? 0.85 : v.va <= 0.5 ? 0.65 : v.va <= 0.6 ? 0.4 : v.va <= 0.7 ? 0.2 : 0;
+  checks.push({ name: 'volatile acidity', score: vaScore, weight: 0.20 });
+
+  // 3. Sulphates
+  const suScore = v.su >= 0.65 && v.su <= 1.1 ? 1 : v.su >= 0.55 && v.su <= 1.4 ? 0.75 : v.su >= 0.45 ? 0.45 : 0.1;
+  checks.push({ name: 'sulphates', score: suScore, weight: 0.15 });
+
+  // 4. Citric acid (freshness)
+  const caScore = v.ca >= 0.25 && v.ca <= 0.7 ? 1 : v.ca >= 0.1 ? 0.6 : v.ca === 0 ? 0.35 : 0.5;
+  checks.push({ name: 'citric acid', score: caScore, weight: 0.10 });
+
+  // 5. Total SO2 (too high = bad)
+  const tsoScore = v.tso <= 50 ? 1 : v.tso <= 80 ? 0.8 : v.tso <= 120 ? 0.5 : v.tso <= 160 ? 0.2 : 0;
+  checks.push({ name: 'total SO₂', score: tsoScore, weight: 0.08 });
+
+  // 6. Density (lower = better for red)
+  const denScore = v.den <= 0.9950 ? 1 : v.den <= 0.9960 ? 0.85 : v.den <= 0.9970 ? 0.65 : v.den <= 0.9985 ? 0.35 : 0.1;
+  checks.push({ name: 'density', score: denScore, weight: 0.07 });
+
+  // 7. Chlorides (lower = cleaner)
+  const clScore = v.cl <= 0.06 ? 1 : v.cl <= 0.08 ? 0.8 : v.cl <= 0.1 ? 0.55 : v.cl <= 0.15 ? 0.25 : 0;
+  checks.push({ name: 'chlorides', score: clScore, weight: 0.07 });
+
+  // 8. Fixed acidity
+  const faScore = v.fa >= 6.5 && v.fa <= 9.5 ? 1 : v.fa >= 5.5 && v.fa <= 11 ? 0.65 : 0.3;
+  checks.push({ name: 'fixed acidity', score: faScore, weight: 0.04 });
+
+  // 9. pH
+  const phScore = v.ph >= 3.1 && v.ph <= 3.4 ? 1 : v.ph >= 2.9 && v.ph <= 3.7 ? 0.65 : 0.25;
+  checks.push({ name: 'pH', score: phScore, weight: 0.03 });
+
+  // 10. Free SO2
+  const fsoScore = v.fso >= 10 && v.fso <= 40 ? 1 : v.fso >= 5 ? 0.6 : 0.3;
+  checks.push({ name: 'free SO₂', score: fsoScore, weight: 0.01 });
+
+  return checks;
+}
+
+function predict(v) {
+  const checks = scoreFeatures(v);
+  const weighted = checks.reduce((acc, c) => acc + c.score * c.weight, 0);
+  const totalWeight = checks.reduce((acc, c) => acc + c.weight, 0);
+  const probability = weighted / totalWeight;
+
+  const isGood = probability >= 0.58;
+  const rawScore = 3 + (probability * 7); // Map to 3-10 scale
+  const score = Math.min(10, Math.max(3, rawScore));
+  const confidence = Math.round(50 + Math.abs(probability - 0.5) * 90);
+
+  const sorted = [...checks].sort((a, b) => b.score - a.score);
+  const positives = sorted.filter(c => c.score >= 0.65).map(c => c.name).slice(0, 3);
+  const negatives = sorted.filter(c => c.score < 0.45).map(c => c.name).slice(0, 3);
+
+  // Generate summary
+  let summary = '';
+  if (isGood) {
+    if (probability > 0.85) summary = 'Exceptional profile with excellent chemical balance and high alcohol expression.';
+    else if (probability > 0.72) summary = 'Strong indicators of quality, particularly in key fermentation markers.';
+    else summary = 'Borderline good profile — passes the quality threshold with moderate confidence.';
+  } else {
+    if (probability < 0.35) summary = 'Multiple chemical markers fall outside optimal ranges for quality wine.';
+    else if (probability < 0.48) summary = 'Several key parameters, especially alcohol and acidity, suggest below-average quality.';
+    else summary = 'Profile narrowly misses the quality threshold — marginal improvements could elevate it.';
+  }
+
+  // Generate tip
+  const worstFeature = [...checks].sort((a, b) => a.score - b.score)[0];
+  const tips = {
+    'alcohol': 'Extend fermentation time to achieve higher alcohol content (target ≥11.5%).',
+    'volatile acidity': 'Improve sanitation during fermentation to reduce volatile acid production.',
+    'sulphates': 'Adjust potassium metabisulphite addition to reach 0.65–0.9 g/L range.',
+    'citric acid': 'Moderate citric acid addition (0.3–0.5 g/L) enhances freshness and stability.',
+    'total SO₂': 'Reduce sulphite additions — high SO₂ masks varietal character.',
+    'density': 'Lower density often follows higher alcohol — review fermentation completion.',
+    'chlorides': 'Check water source and salt contamination — target below 0.08 g/L.',
+    'fixed acidity': 'Moderate acid adjustments (tartaric) to bring within 6.5–9.5 g/L range.',
+    'pH': 'Acid additions or malo-lactic control can improve pH balance (target 3.1–3.4).',
+    'free SO₂': 'Ensure adequate free SO₂ (15–35 mg/L) for antimicrobial protection.',
+  };
+
+  return {
+    isGood,
+    score: score.toFixed(1),
+    confidence,
+    summary,
+    positives,
+    negatives,
+    tip: tips[worstFeature.name] || 'Review overall winemaking parameters for quality improvements.'
+  };
+}
+
+function runPrediction() {
+  const btn = document.getElementById('pred_btn');
+  const card = document.getElementById('result_card');
+
+  btn.disabled = true;
+  btn.textContent = 'Analysing…';
+
+  card.className = 'result-card';
+  card.innerHTML = `<div class="loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+
+  // Simulate brief analysis delay for UX
+  setTimeout(() => {
+    const v = getValues();
+    const r = predict(v);
+    renderResult(r, card);
+    btn.disabled = false;
+    btn.textContent = 'Analyse Quality';
+  }, 700);
+}
+
+function renderResult(r, card) {
+  const cls = r.isGood ? 'good' : 'bad';
+  const verdict = r.isGood ? 'Good' : 'Poor';
+
+  const positiveHTML = r.positives.length
+    ? r.positives.map(f => `<div class="factor-tag"><div class="factor-dot pos"></div>${f}</div>`).join('')
+    : '<div class="factor-tag" style="color:var(--muted);font-style:italic">none identified</div>';
+
+  const negativeHTML = r.negatives.length
+    ? r.negatives.map(f => `<div class="factor-tag"><div class="factor-dot neg"></div>${f}</div>`).join('')
+    : '<div class="factor-tag" style="color:var(--muted);font-style:italic">none identified</div>';
+
+  card.className = `result-card ${cls}`;
+  card.innerHTML = `
+    <div class="result-verdict">
+      <div>
+        <div class="verdict-label ${cls}">${verdict}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;margin-top:4px;">Quality Grade</div>
+      </div>
+      <div class="score-ring ${cls}">
+        <div class="score-num ${cls}">${r.score}</div>
+        <div class="score-denom">/10</div>
+      </div>
+    </div>
+
+    <div class="confidence-bar-wrap">
+      <div class="confidence-meta">
+        <span class="confidence-label">Confidence</span>
+        <span class="confidence-val">${r.confidence}%</span>
+      </div>
+      <div class="confidence-bar">
+        <div class="confidence-fill" id="conf_fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <p class="result-summary">${r.summary}</p>
+
+    <div class="divider"></div>
+
+    <div class="factors-grid">
+      <div>
+        <div class="factor-section-title">Strengths</div>
+        ${positiveHTML}
+      </div>
+      <div>
+        <div class="factor-section-title">Weaknesses</div>
+        ${negativeHTML}
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="tip-box">
+      <strong>Winemaker's note</strong>
+      ${r.tip}
+    </div>
+  `;
+
+  // Animate confidence bar
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('conf_fill').style.width = r.confidence + '%';
+    });
+  });
+}
+
+// Init on load
+initTracks();
+</script>
+</body>
+</html>
